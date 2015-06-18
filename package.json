@@ -1,0 +1,40 @@
+{
+  "name": "introspect-pryfs",
+  "version": "0.1.0",
+  "description": "A small library to walk/watch the file system with streams",
+  "author": "subtenante@gmail.com",
+  "license": "GPL",
+  "keywords": [
+    "javascript",
+    "fs",
+    "watch",
+    "es6"
+  ],
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/subtenante/introspect-pryfs.git"
+  },
+  "devDependencies": {
+    "babel": "^5.5.8",
+    "chai": "1.9.x",
+    "del": "0.1.x",
+    "gulp": "3.x.x",
+    "gulp-babel": "^5.1.0",
+    "gulp-concat": "2.4.x",
+    "gulp-jshint": "1.8.x",
+    "gulp-mocha": "1.1.x",
+    "gulp-sourcemaps": "1.2.x",
+    "jshint-stylish": "1.x.x",
+    "marked-toc": "^0.2.8",
+    "mocha": "1.x.x"
+  },
+  "dependencies": {
+    "introspect-stream": "^0.1.0",
+    "introspect-typed": "^1.0.0",
+    "lodash": "2.x.x"
+  }
+}

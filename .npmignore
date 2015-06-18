@@ -1,0 +1,6 @@
+src/
+tmp/
+gulpfile.js
+.editorconfig
+.jshintrc
+bower.json
