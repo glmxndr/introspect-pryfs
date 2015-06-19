@@ -8,17 +8,7 @@ import stream from 'introspect-stream';
 import { overload } from 'introspect-typed';
 
 import { glob } from './glob';
-
-var FsEvent = function (type, file, base) {
-  if (!(this instanceof FsEvent)) { return new FsEvent(type, file, base); }
-  _.extend(this, {file, type, base});
-};
-
-FsEvent.prototype = {
-  toString () {
-    return `FsEvent [${this.type} ${path.relative(this.base, this.file)}]`;
-  }
-};
+import { FsEvent } from './fsevent';
 
 var ignore = function (patterns, filepath) {
   return patterns.reduce((ign, p) => {
@@ -33,35 +23,53 @@ var ignore = function (patterns, filepath) {
 var watchDir = function (dirpath, stream, opts) {
   if (ignore(opts.ignore, dirpath)) { return; }
   let watcher = fs.watch(dirpath, {persistent: opts.persistent, recursive: false});
+
+  var onAdded = file => {
+    // If the file is already monitored, it was not created...
+    // so do nothing, since it was probably a glitch from fs.watch
+    if (opts.monitored.has(file)) { return; }
+
+    var statFn = opts.followSymLinks ? 'lstat' : 'stat';
+    fs[statFn](file, (err, stats) => {
+      if (err && !opts.quiet) {
+        console.error(`pryfs/watchDir - ${statFn} on [${file}] ERROR ${err}`);
+        return;
+      }
+
+      // Check that the file was really created by checking its creation time.
+      // If the file was created more than 1 second ago, the current event
+      // results from a glitch in multiple fs.watch watchers.
+      var creationTime = stats.birthtime.getTime();
+      var now = new Date().getTime();
+      var diff = now - creationTime;
+      if (diff > 1000) { return; }
+
+      opts.monitored.add(file);
+      stream.next(FsEvent('added', file, opts.base));
+
+      if (opts.recursive && stats.isDirectory()) {
+        watchDir(file, stream, opts);
+      }
+    });
+  };
+
+  var onDeleted = file => {
+    if (!opts.monitored.has(file)) { return; }
+    opts.monitored.delete(file);
+    stream.next(FsEvent('deleted', file, opts.base));
+  };
+
   var onChange = name => {
     let file = path.join(dirpath, name);
     if (!opts.monitored.has(file)) { return; }
     stream.next(FsEvent('changed', file, opts.base));
   };
+  
   var onRename = name => {
     let file = path.join(dirpath, name);
-    fs.exists(file, added => {
-      let deleted = !added;
-      let type = added ? 'added' : 'deleted';
-      if (deleted && !opts.monitored.has(file)) { return; }
-      stream.next(FsEvent(type, file, opts.base));
-
-      if (deleted) {
-        opts.monitored.delete(file);
-        return;
-      } else {
-        opts.monitored.add(file);
-      }
-      var statFn = opts.followSymLinks ? 'lstat' : 'stat';
-      fs[statFn](file, (err, stats) => {
-        if (err && !opts.quiet) {
-          console.error(`pryfs/watchDir - ${statFn} on [${file}] ERROR ${err}`);
-          return;
-        }
-        if (stats.isDirectory()) { watchDir(file, stream, opts); }
-      });
-    });
+    fs.exists(file, added => (added ? onAdded : onDeleted)(file));
   };
+
   watcher.on('change', function (event, name) {
     console.log(arguments);
     if (event === 'rename') { onRename(name); }
