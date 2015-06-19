@@ -9,7 +9,16 @@ import { overload } from 'introspect-typed';
 
 import { glob } from './glob';
 
-var
+var FsEvent = function (type, file, base) {
+  if (!(this instanceof FsEvent)) { return new FsEvent(type, file, base); }
+  _.extend(this, {file, type, base});
+};
+
+FsEvent.prototype = {
+  toString () {
+    return `FsEvent [${this.type} ${path.relative(this.base, this.file)}]`;
+  }
+};
 
 var ignore = function (patterns, filepath) {
   return patterns.reduce((ign, p) => {
@@ -26,16 +35,22 @@ var watchDir = function (dirpath, stream, opts) {
   let watcher = fs.watch(dirpath, {persistent: opts.persistent, recursive: false});
   var onChange = name => {
     let file = path.join(dirpath, name);
-    stream.next('changed', path.relative(opts.base, file), 'from = ' + path.relative(opts.base, dirpath));
+    if (!opts.monitored.has(file)) { return; }
+    stream.next(FsEvent('changed', file, opts.base));
   };
   var onRename = name => {
     let file = path.join(dirpath, name);
-    fs.exists(file, e => {
-      let type = e ? 'added' : 'deleted';
-      stream.next(type, path.relative(opts.base, file), 'from = ' + path.relative(opts.base, dirpath));
+    fs.exists(file, added => {
+      let deleted = !added;
+      let type = added ? 'added' : 'deleted';
+      if (deleted && !opts.monitored.has(file)) { return; }
+      stream.next(FsEvent(type, file, opts.base));
 
-      if (!e) {
+      if (deleted) {
+        opts.monitored.delete(file);
         return;
+      } else {
+        opts.monitored.add(file);
       }
       var statFn = opts.followSymLinks ? 'lstat' : 'stat';
       fs[statFn](file, (err, stats) => {
@@ -79,8 +94,9 @@ pryPath = function (file, stream, opts) {
       console.error(`pryfs/pryPath - lstat on [${file}] ERROR ${err}`);
       return;
     }
+    opts.monitored.add(file);
     if (opts.walk) {
-      stream.next('visited', path.relative(opts.base, file));
+      stream.next(FsEvent('visited', file, opts.base));
     }
     if (stats.isDirectory()) {
       if (opts.watch) { watchDir(file, stream, opts); }
@@ -104,6 +120,7 @@ export var pry = overload(
   [String, Object],
   (base,   opts)   => {
     opts = _.defaults(opts || {}, PRY_DEFAULTS, { base });
+    opts.monitored = new Set();
     var s = stream('pryFs').log();
     pryPath(base, s, opts);
     return s;
