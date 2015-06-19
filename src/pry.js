@@ -22,11 +22,14 @@ export var pry = overload(
     opts = _.defaults(opts || {}, PRY_DEFAULTS, { base });
     opts.monitored = new Set();
     var s = stream('pryFs').log();
-    walkPath(base, s, opts);
+    var promise = walkPath(base, s, opts);
+    if (!opts.watch) {
+      promise.then(() => s.end());
+    }
     return s;
   })
   .when([String], base => pry.default(base, {}))
   .when([Object], opts => pry.default(opts.base || process.cwd(), opts))
   .when([], () => pry.default(process.cwd(), {}));
 
-pry()
+pry({watch: false});
