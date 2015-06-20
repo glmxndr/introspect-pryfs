@@ -13,7 +13,7 @@ import { pry } from '../src/pry';
 
 describe('pry', () => {
   it ('should provide promise, base path and opts', () => {
-    let s = pry.walk('tmp');
+    let s = pry.walk('tmp', {quiet: true});
     expect(s.pry.base).to.equal(path.join(process.cwd(), 'tmp'));
     expect(s.pry.promise).to.be.truthy;
     expect(s.pry.opts).to.be.truthy;
@@ -24,13 +24,12 @@ describe('pry', () => {
     fs.ensureDirSync('tmp/test-pry/sub');
 
     let results = {};
-    let s = pry('tmp/test-pry');
+    let s = pry('tmp/test-pry', {quiet: true});
     s.onNext(evt => {
       if (!results[evt.type]) { results[evt.type] = []; }
       results[evt.type].push(evt.relative());
     });
     s.onEnd(() => {
-
       fs.removeSync('tmp/test-pry');
       done();
     });
@@ -48,7 +47,8 @@ describe('pry', () => {
     setTimeout(() => {
       expect(s.ended()).to.be.false;
       expect(results.visited.length).to.equal(2);
-
+      expect(results.added.length).to.equal(7);
+      expect(results.deleted.length).to.equal(2);
       s.end();
     }, 50);
 
