@@ -2,4 +2,4 @@
 
 require('babel/polyfill');
 
-module.exports = require('./lib/node/pryfs');
+module.exports = require('./lib/node/pry');

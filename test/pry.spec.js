@@ -8,7 +8,7 @@ import _ from 'lodash';
 import chai from 'chai';
 const expect = chai.expect;
 
-import { pry } from '../src/pry';
+import { pry } from '../';
 
 
 describe('pry', () => {
