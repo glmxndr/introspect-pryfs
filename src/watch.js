@@ -7,19 +7,45 @@ import _ from 'lodash';
 import { FsEvent } from './fsevent';
 import { ignore } from './ignore';
 
+// This method deals with file which would have been added to a recently monitored
+// folder which had content before we could attach a watcher to it.
+var onAddSub = (base, stream, opts) => {
+  fs.readdir(base, (err, files) => {
+    files.forEach(f => {
+      let subfile = path.join(base, f);
+      if (opts.monitored.has(subfile)) { return; }
+      opts.monitored.add(subfile);
+      stream.next(FsEvent('added', subfile, opts.base));
+      if (opts.recursive) {
+        var statFn = opts.followSymLinks ? 'lstat' : 'stat';
+        fs[statFn](subfile, (err, stats) => {
+          if (stats.isDirectory()) {
+            onAddSub(subfile, stream, opts);
+          }
+        });
+      }
+    });
+  });
+};
+
 export var watchDir = function (dirpath, stream, opts) {
   if (ignore(opts.ignore, dirpath)) { return; }
-  let watcher = fs.watch(dirpath, {persistent: opts.persistent, recursive: false});
 
-  var onAdded = file => {
+  let watcher = fs.watch(dirpath, {persistent: opts.persistent, recursive: false});
+  stream.onEnd(() => watcher.close());
+
+  var onAdd = file => {
     // If the file is already monitored, it was not created...
     // so do nothing, since it was probably a glitch from fs.watch
-    if (opts.monitored.has(file)) { return; }
+    if (opts.monitored.has(file)) {
+      if (opts.verbose) { console.log(`pryFs/watchDir/onAdd - already monitored [${file}]`); }
+      return;
+    }
 
     var statFn = opts.followSymLinks ? 'lstat' : 'stat';
     fs[statFn](file, (err, stats) => {
-      if (err && !opts.quiet) {
-        console.error(`pryfs/watchDir - ${statFn} on [${file}] ERROR ${err}`);
+      if (err) {
+        if (!opts.quiet) { console.error(`pryfs/watchDir/onAdd - ${statFn} on [${file}] ERROR ${err}`); }
         return;
       }
 
@@ -34,30 +60,40 @@ export var watchDir = function (dirpath, stream, opts) {
       opts.monitored.add(file);
       stream.next(FsEvent('added', file, opts.base));
 
-      if (opts.recursive && stats.isDirectory()) {
-        watchDir(file, stream, opts);
+      if (stats.isDirectory()) {
+        onAddSub(file, stream, opts);
+        if (opts.recursive) {
+          watchDir(file, stream, opts);
+        }
       }
     });
   };
 
-  var onDeleted = file => {
-    if (!opts.monitored.has(file)) { return; }
+  var onDelete = file => {
+    if (!opts.monitored.has(file)) {
+      if (opts.verbose) { console.log(`pryFs/watchDir/onDelete - not monitored [${file}]`); }
+      return;
+    }
     opts.monitored.delete(file);
     stream.next(FsEvent('deleted', file, opts.base));
   };
 
   var onChange = name => {
     let file = path.join(dirpath, name);
-    if (!opts.monitored.has(file)) { return; }
+    if (!opts.monitored.has(file)) {
+      if (opts.verbose) { console.log(`pryFs/watchDir/onChange - not monitored [${file}]`); }
+      return;
+    }
     stream.next(FsEvent('changed', file, opts.base));
   };
 
   var onRename = name => {
     let file = path.join(dirpath, name);
-    fs.exists(file, added => (added ? onAdded : onDeleted)(file));
+    fs.exists(file, added => (added ? onAdd : onDelete)(file));
   };
 
   watcher.on('change', function (event, name) {
+    if (ignore(opts.ignore, path.join(dirpath, name))) { return; }
     if (event === 'rename') { onRename(name); }
     if (event === 'change') { onChange(name); }
   });

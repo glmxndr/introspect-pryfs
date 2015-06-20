@@ -22,6 +22,7 @@
     "babel": "^5.5.8",
     "chai": "1.9.x",
     "del": "0.1.x",
+    "fs-extra": "^0.20.0",
     "gulp": "3.x.x",
     "gulp-babel": "^5.1.0",
     "gulp-concat": "2.4.x",
