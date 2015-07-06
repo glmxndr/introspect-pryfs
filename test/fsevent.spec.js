@@ -53,4 +53,13 @@ describe('FsEvent', () => {
       expect(evt.dir).to.equal(path.parse(__filename).dir);
     });
   });
+  describe('.transform', () => {
+    it ('should provide a promise with the transformed content', (done) => {
+      var fn = data => (data.split(/\bimport\b/g).length);
+      evt.transform(fn).then(n => {
+        expect(n).to.equal(5);
+        done();
+      });
+    });
+  });
 });

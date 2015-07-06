@@ -1,6 +1,6 @@
 {
   "name": "introspect-pryfs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A small library to walk/watch the file system with streams",
   "author": "subtenante@gmail.com",
   "license": "GPL",

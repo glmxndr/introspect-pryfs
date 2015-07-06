@@ -4,12 +4,11 @@ import fs from 'fs';
 import path from 'path';
 import _ from 'lodash';
 
-import { FsEvent } from './fsevent';
 import { ignore } from './ignore';
 import { watchDir } from './watch';
 
 export var walkPath;
-var walkDir = function (filepath, stream, opts) {
+var walkDir = function (filepath, opts) {
   if (ignore(opts.ignore, filepath)) { return; }
   var promise = new Promise((resolve, reject) => {
     fs.readdir(filepath, function (err, files) {
@@ -22,7 +21,7 @@ var walkDir = function (filepath, stream, opts) {
       (files || []).forEach(f => {
         let subpath = path.join(filepath, f);
         if (ignore(opts.ignore, subpath)) { return; }
-        let p = walkPath(subpath, stream, opts);
+        let p = walkPath(subpath, opts);
         ps.push(p);
       });
       Promise.all(ps).then(() => resolve());
@@ -31,7 +30,7 @@ var walkDir = function (filepath, stream, opts) {
   return promise;
 };
 
-walkPath = function (file, stream, opts) {
+walkPath = function (file, opts) {
   if (ignore(opts.ignore, file)) { return Promise.resolve(); }
   var statFn = opts.followSymLinks ? 'lstat' : 'stat';
   var promise = new Promise((resolve, reject) => {
@@ -41,19 +40,20 @@ walkPath = function (file, stream, opts) {
         reject(err);
         return;
       }
-      opts.monitored.add(file);
+      if (!stats.isDirectory) { console.log(stats); }
+      var isDir = stats.isDirectory();
+      opts.monitored.set(file, isDir);
       if (opts.walk) {
-        stream.next(FsEvent('visited', file, opts.base));
+        opts.maybeFire('visited', file, isDir);
       }
-      if (stats.isDirectory()) {
-        if (opts.watch) { watchDir(file, stream, opts); }
+      if (isDir) {
+        if (opts.watch) { watchDir(file, opts); }
         if (opts.recursive) {
-          walkDir(file, stream, opts).then(() => { resolve(); });
+          walkDir(file, opts).then(() => { resolve(); });
         }
         else { resolve(); }
-      } else {
-        resolve();
       }
+      else { resolve(); }
     });
   });
   return promise;

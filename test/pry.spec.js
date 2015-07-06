@@ -24,7 +24,7 @@ describe('pry', () => {
     fs.ensureDirSync('tmp/test-pry/sub');
 
     let results = {};
-    let s = pry('tmp/test-pry', {quiet: true});
+    let s = pry('tmp/test-pry', {quiet: true, filesOnly: false});
     s.onNext(evt => {
       if (!results[evt.type]) { results[evt.type] = []; }
       results[evt.type].push(evt.relative());
@@ -42,7 +42,7 @@ describe('pry', () => {
       fs.ensureFileSync('tmp/test-pry/sub1/sub1/sub1/file1');
       fs.ensureDirSync('tmp/test-pry/sub2/');
       fs.remove('tmp/test-pry/sub1/');
-    }, 10);
+    }, 5);
 
     setTimeout(() => {
       expect(s.ended()).to.be.false;
